@@ -1,0 +1,40 @@
+//
+//  Cite.swift
+//  HTMLStandard
+//
+//  Generated on 07/04/2025. 
+//  THIS FILE IS GENERATED. DO NOT EDIT.
+//
+
+/// <cite> Title of a work
+public class Cite : NHTMLRenderable, IFlow, IPalpable, IPhrasing {
+
+
+    public init() {
+        super.init()
+    }
+
+    public init(_ attributes:[String:String], _ parser:XMLParser? = nil) throws {
+        var globalAttr = GlobalAttributesBuilder()
+        for (key, value) in attributes {
+            switch (key) {
+
+                default: break
+            }
+            if globalAttr.trySetGlobalAttribute(key, value) {
+                continue
+            }
+            throw AppError("Unexpected attribute: \(key)")
+        }
+        var allItems:[NHTMLRenderable] = []
+        while let obj = try parser?.readObject(endTag: "cite", xmlToHtmlMapper) {
+            allItems.append(obj)
+        }
+        super.init(globalAttr, allItems)
+    }
+
+
+    public func addChild(_ someElement:IPhrasing) {
+        children.append(someElement)
+    }
+}
