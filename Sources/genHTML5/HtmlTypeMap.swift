@@ -131,7 +131,7 @@ public enum HtmlTypeMap {
             case .urlList:
                 return "[URL]"
             case .url:
-                return "URL"
+                return "URL?" //TODO: Shouldn't be optional but we need to modify the initialize to support it.
             case .urlOptional:
                 return "URL?"
             case .tokenList:
@@ -166,6 +166,55 @@ public enum HtmlTypeMap {
                 return "InputType?"
             case .csv:
                 return "[String]"
+        }
+    }
+    
+    func defaultValue() -> String {
+        switch (self) {
+            case .text:
+                return "nil"
+            case .keywords:
+                return "nil"
+            case .boolean:
+                return "false"
+            case .urlList:
+                return "[]"
+            case .url:
+                return "nil"
+            case .urlOptional:
+                return "nil"
+            case .tokenList:
+                return "[]"
+            case .tokenSet:
+                return "[]"
+            case .uInt:
+                return "nil"
+            case .sInt:
+                return "nil"
+            case .floatList:
+                return "[]"
+            case .float:
+                return "nil"
+            case .date:
+                return "nil"
+            case .srcSizeList:
+                return "[]"
+            case .mediaList:
+                return "nil"
+            case .browsingContext:
+                return "nil"
+            case .referrerPolicy:
+                return "nil"
+            case .sandbox:
+                return "Set()"
+            case .iframeSrcDoc:
+                return "nil"
+            case .mimeType:
+                return "nil"
+            case .inputType:
+                return "nil"
+            case .csv:
+                return "[]"
         }
     }
     

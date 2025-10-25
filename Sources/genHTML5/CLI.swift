@@ -172,6 +172,7 @@ struct Process: AsyncParsableCommand {
                 let typeDesc = showTypeInfo ? " \(def.value_type)." : ""
                 let typeMap = try HtmlTypeMap(expect: def.value_type)
                 let type = usesKeywords ? enumName : typeMap.typeFrom()
+                let typeDefaultValue = typeMap.defaultValue()
                 
                 if (attributeInfo.isGlobal()) {
                     if (usesKeywords) {
@@ -207,7 +208,7 @@ struct Process: AsyncParsableCommand {
                     let optional = usesKeywords ? "?" : ""
                     let attributeStr = """
                         /// \(def.desc).\(typeDesc)
-                        public var \(attributeInfo.name):\(type)\(optional)
+                        public var \(attributeInfo.name):\(type)\(optional) = \(typeDefaultValue)
                     """ + "\n\n"
                     attributes += attributeStr
                     if (usesKeywords) {
@@ -243,7 +244,7 @@ struct Process: AsyncParsableCommand {
                 let attrName = possibleAttributes.first!.name
                 let attributeStr = """
                     /// \(attrDesc).\(typeInfo)
-                    public var \(attrName):String?
+                    public var \(attrName):String? = nil
                 """ + "\n\n"
                 attributes += attributeStr
                 attributeSerialization += """
@@ -351,8 +352,8 @@ struct CLI {
             var args:[String] = Array(cmdLinArgs)
             
             #if DEBUG
-            args.append(contentsOf: ["--help"])
-            //args.append(contentsOf: ["io", "-f", "-h", "http://desktop.lan:11434", "-m", "milkey/reader-lm-v2", "--prompt", "Please convert this html into markdown. ", "-i", "/Users/isaacpaul/Downloads/test/html5Spec.html-part30.txt", "-o", "/Users/isaacpaul/Downloads/result.json"])
+            //args.append(contentsOf: ["--help"])
+            //args.append(contentsOf: ["io", "-f", "-m", "milkey/reader-lm-v2"])
             #endif
             
             await Process.main(args)
