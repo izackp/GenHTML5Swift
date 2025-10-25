@@ -13,7 +13,8 @@ public enum HtmlTypeMap {
     case urlList
     case url
     case urlOptional
-    case tokenList
+    case tokenListSpaceSep
+    case tokenListCommaSep
     case tokenSet
     case uInt
     case sInt
@@ -63,7 +64,9 @@ public enum HtmlTypeMap {
             case "Set of space-separated tokens consisting of valid non-empty URLs": return .urlList
             case "Valid non-empty URL potentially surrounded by spaces": return .url
             case "Valid URL potentially surrounded by spaces": return .urlOptional
-            case "Set of space-separated tokens": return .tokenList
+            case "Set of space-separated tokens": return .tokenListSpaceSep
+            case "Ordered set of unique space-separated tokens, case-sensitive, consisting of one code point in length": return .tokenListSpaceSep
+            case "Unordered set of unique space-separated tokens, case-sensitive, consisting of valid absolute URL. The actual rules are more complicated than indicated": return .tokenListSpaceSep
             case "Unordered set of unique space-separated tokens, ASCII case-insensitive, consisting of sizes. The actual rules are more complicated than indicated": return .tokenSet
             case "Unordered set of unique space-separated tokens. The actual rules are more complicated than indicated": return .tokenSet
             case "Unordered set of unique space-separated tokens, case-sensitive, consisting of IDs. The actual rules are more complicated than indicated": return .tokenSet
@@ -98,8 +101,10 @@ public enum HtmlTypeMap {
             case "Valid month string, valid date string, valid yearless date string, valid time string, valid local date and time string, valid time-zone offset string, valid global date and time string, valid week string, valid non-negative integer, or valid duration string": return .text
             case "Autofill field name and related tokens. The actual rules are more complicated than indicated": return .text
             case "Potential destination, for rel=\"preload\"; script-like destination, for rel=\"modulepreload\"": return .text
-            case "Set of comma-separated tokens* consisting of valid MIME type strings with no parameters or audio/*, video/*, or image/. The actual rules are more complicated than indicated": return .tokenList
+            case "Set of comma-separated tokens* consisting of valid MIME type strings with no parameters or audio/*, video/*, or image/. The actual rules are more complicated than indicated": return .tokenListCommaSep
             case "Valid floating-point number greater than zero, or \"any\"": return .float
+            case "Valid BCP 47 language tag or the empty string": return .text
+            case "CSS declarations. The actual rules are more complicated than indicated": return .text
             default:
                 throw AppError("Unexpected value for HtmlTypeMap: \(rawValue)")
         }
@@ -134,7 +139,9 @@ public enum HtmlTypeMap {
                 return "URL?" //TODO: Shouldn't be optional but we need to modify the initialize to support it.
             case .urlOptional:
                 return "URL?"
-            case .tokenList:
+            case .tokenListSpaceSep:
+                return "[String]"
+            case .tokenListCommaSep:
                 return "[String]"
             case .tokenSet:
                 return "[String]" //Swift doesn't have ordered set
@@ -183,7 +190,9 @@ public enum HtmlTypeMap {
                 return "nil"
             case .urlOptional:
                 return "nil"
-            case .tokenList:
+            case .tokenListCommaSep:
+                return "[]"
+            case .tokenListSpaceSep:
                 return "[]"
             case .tokenSet:
                 return "[]"
@@ -218,4 +227,57 @@ public enum HtmlTypeMap {
         }
     }
     
+    static let parseListCommaSep = "try String.parseList(attValue, \",\")"
+    static let parseListSpaceSep = "try String.parseList(attValue, \" \")"
+    
+    func valueTransform(_ typeName:String = "") -> String {
+        switch (self) {
+            case .text:
+                return "attValue"
+            case .keywords:
+                return "try \(typeName)(expect: attValue)"
+            case .boolean:
+                return "true"
+            case .urlList:
+                return "try URL.parseList(attValue, \" \")"
+            case .url:
+                return "try URL(expect: attValue)"
+            case .urlOptional:
+                return "try URL(expect: attValue)"
+            case .tokenListCommaSep:
+                return "parseListCommaSep"
+            case .tokenListSpaceSep:
+                return HtmlTypeMap.parseListSpaceSep
+            case .tokenSet:
+                return HtmlTypeMap.parseListSpaceSep
+            case .uInt:
+                return "UInt(attValue)"
+            case .sInt:
+                return "Int(attValue)"
+            case .floatList:
+                return HtmlTypeMap.parseListCommaSep
+            case .float:
+                return "Float(attValue)"
+            case .date:
+                return "attValue"
+            case .srcSizeList:
+                return HtmlTypeMap.parseListCommaSep
+            case .mediaList:
+                return "attValue"
+            case .browsingContext:
+                return "attValue"
+            case .referrerPolicy:
+                return "try ReferrerPolicy(expect: attValue)"
+            case .sandbox:
+                return "Set()"
+            case .iframeSrcDoc:
+                return "attValue"
+            case .mimeType:
+                return "attValue"
+            case .inputType:
+                return "try InputType(expect: attValue)"
+            case .csv:
+                return HtmlTypeMap.parseListCommaSep
+        }
+    }
 }

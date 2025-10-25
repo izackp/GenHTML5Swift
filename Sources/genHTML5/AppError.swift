@@ -7,6 +7,7 @@
 
 import Foundation
 
+/// let someUrl:URL = try URL("hello") ?! AppError("What")
 infix operator ?!: NilCoalescingPrecedence
 
 public func ?!<T>(value: T?, error: @autoclosure () -> Error) throws -> T {

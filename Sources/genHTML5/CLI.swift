@@ -63,7 +63,12 @@ struct Process: AsyncParsableCommand {
                 let fileBody = try Process.genElement(elementName: eachKey, eachDef, htmlStandard)
                 print("\(eachKey): Body Generated Successfully")
                 let upperElementName = eachKey.uppercaseFirstLetter()
-                let fileName = "\(upperElementName).swift"
+                let fileName:String
+                if (eachKey == "main") {
+                    fileName = "\(upperElementName)Element.swift"
+                } else {
+                    fileName = "\(upperElementName).swift"
+                }
                 let destination = outElementsDir.appending(path: fileName)
                 let strOutput = destination.absoluteString
                 print("Determined output: \(strOutput)")
@@ -110,22 +115,29 @@ struct Process: AsyncParsableCommand {
             }
             if (possibleAttributes.count == 1) {
                 let attributeInfo:Attribute = possibleAttributes[0]
+                let swiftAttrName = attributeInfo.varName()
                 let def = attributeInfo.definition
-                if (def.elements.first == "HTML") {//IsGlobalAndNotSpecial
-                    continue
-                }
+                //let skipSerialization = def.elements.first == "HTML"
+                //if (def.elements.first == "HTML") {//IsGlobalAndNotSpecial
+                //    continue
+                //}
                 let showTypeInfo = HtmlTypeMap.valueTypeIsDesc(def.value_type)
                 
-                let enumName = attributeInfo.name.uppercaseFirstLetter()
-                let usesKeywords = def.value_keywords.count > 0
+                let enumName = attributeInfo.enumName()
+                let isYesNoBool = def.isYesNoBool()
+                let isTrueFalseBool = def.isTrueFalseBool()
+                let isOptionalBool = isYesNoBool || isTrueFalseBool
+                let usesKeywords = isOptionalBool == false && def.value_keywords.count > 0
                 
                 if usesKeywords { //Creates enum
                     
                     var possibleValuesStr = ""
                     for eachPossibleValue in def.value_keywords {
                         let altMap:String?
-                        if (eachPossibleValue.firstIndex(of: "-") != nil) {
-                            altMap = eachPossibleValue.toCamelCase()
+                        if (eachPossibleValue == "subscript") {
+                            altMap = "subscript_"
+                        } else if (eachPossibleValue.firstIndex(of: "-") != nil || eachPossibleValue.firstIndex(of: "/") != nil) {
+                            altMap = eachPossibleValue.fixPoorCharactersForVariables()
                         } else {
                             altMap = nil
                         }
@@ -135,6 +147,7 @@ struct Process: AsyncParsableCommand {
                             possibleValuesStr += "\n        case \(eachPossibleValue)"
                         }
                     }
+                    
                     let enumStr = "\n" + """
     public enum \(enumName) : String, CaseIterable {
 \(possibleValuesStr)
@@ -164,6 +177,14 @@ struct Process: AsyncParsableCommand {
             self = result
         }
         
+        static func parseList(_ value:String?, _ separator:String = " ") throws -> [\(enumName)] {
+            guard let value = value else { return [] }
+            var iterator = value.componentsIterator(separatedBy: separator)
+            let result = try iterator.map { input in
+                return try expect(\(enumName)(rawValue: input), "unexpected value for \(enumName): \\(input)")
+            }
+            return result
+        }
     }
 """
                     enums += enumStr + "\n"
@@ -171,55 +192,62 @@ struct Process: AsyncParsableCommand {
                 
                 let typeDesc = showTypeInfo ? " \(def.value_type)." : ""
                 let typeMap = try HtmlTypeMap(expect: def.value_type)
-                let type = usesKeywords ? enumName : typeMap.typeFrom()
+                var type = usesKeywords ? enumName : typeMap.typeFrom()
+                if (isOptionalBool) {
+                    type = "Bool"
+                }
                 let typeDefaultValue = typeMap.defaultValue()
+                let valueTransform = typeMap.valueTransform(type)
                 
                 if (attributeInfo.isGlobal()) {
                     if (usesKeywords) {
                         let attributeStr = """
                             /// \(def.desc).\(typeDesc)
-                            public var \(attributeInfo.name):\(type) {
+                            public var \(swiftAttrName):\(type) {
                                 get { return \(type)(rawValue: globalAttributes[.\(attributeInfo.name)]) }
                                 set { globalAttributes[.\(attributeInfo.name)] = newValue.rawValue }
                             }
                         """ + "\n\n"
                         attributes += attributeStr
                         
-                        attributeSerialization += """
-                                        case \"\(attributeInfo.name)\":
-                                            \(attributeInfo.name) = try \(type)(expect: value)
-                        """ + "\n"
                     } else {
                         let attributeStr = """
                         
                             /// \(def.desc).\(typeDesc)
-                            public var \(attributeInfo.name):\(type) {
+                            public var \(swiftAttrName):\(type) {
                                 get { return globalAttributes[.\(attributeInfo.name)] }
                                 set { globalAttributes[.\(attributeInfo.name)] = newValue }
                             }
                         """ + "\n\n"
                         attributes += attributeStr
-                        attributeSerialization += """
-                                    case \"\(attributeInfo.name)\":"
-                                        \(attributeInfo.name) = \(attributeInfo.isBoolean() ? "true" : "value")
-                        """ + "\n"
                     }
                 } else {
-                    let optional = usesKeywords ? "?" : ""
+                    let optional = (usesKeywords || isOptionalBool) ? "?" : ""
                     let attributeStr = """
                         /// \(def.desc).\(typeDesc)
-                        public var \(attributeInfo.name):\(type)\(optional) = \(typeDefaultValue)
+                        public var \(swiftAttrName):\(type)\(optional) = \(typeDefaultValue)
                     """ + "\n\n"
                     attributes += attributeStr
                     if (usesKeywords) {
                         attributeSerialization += """
                                         case \"\(attributeInfo.name)\":
-                                            \(attributeInfo.name) = try \(type)(expect: value)
+                                            \(swiftAttrName) = try \(type)(expect: attValue)
+                        """ + "\n"
+                    } else if (isOptionalBool) {
+                        let expect:String
+                        if (isYesNoBool) {
+                            expect = "expectYesOrNo"
+                        } else {
+                            expect = "expect"
+                        }
+                        attributeSerialization += """
+                                        case \"\(attributeInfo.name)\":
+                                            \(swiftAttrName) = try \(type)(\(expect): attValue)
                         """ + "\n"
                     } else {
                         attributeSerialization += """
                                         case \"\(attributeInfo.name)\":
-                                            \(attributeInfo.name) = \(attributeInfo.isBoolean() ? "true" : "value")
+                                            \(swiftAttrName) = \(valueTransform)
                         """ + "\n"
                     }
                 }
@@ -249,7 +277,7 @@ struct Process: AsyncParsableCommand {
                 attributes += attributeStr
                 attributeSerialization += """
                                 case \"\(attrName)\":
-                                    \(attrName) = value
+                                    \(attrName) = attValue
                 """ + "\n"
             }
         }
@@ -293,6 +321,9 @@ struct Process: AsyncParsableCommand {
         }
         
         for eachElement in childElements {
+            if (eachElement.firstIndex(of: " ") != nil) {
+                continue
+            }
             let elementName = eachElement.uppercaseFirstLetter()
             let functionText = "\n\n" + """
             public func addChild(_ someElement:\(elementName)) {
@@ -304,23 +335,20 @@ struct Process: AsyncParsableCommand {
         
         let data = """
 \(header)
+import Foundation
 
 /// <\(elementName)> \(element.desc)
 public class \(upperElementName) : NHTMLRenderable\(interfaceText) {
 \(enums)
 \(attributes)
-    public init() {
-        super.init()
-    }
-
     public init(_ attributes:[String:String], _ parser:XMLParser? = nil) throws {
         var globalAttr = GlobalAttributesBuilder()
-        for (key, value) in attributes {
+        for (key, attValue) in attributes {
             switch (key) {
 \(attributeSerialization)
                 default: break
             }
-            if globalAttr.trySetGlobalAttribute(key, value) {
+            if globalAttr.trySetGlobalAttribute(key, attValue) {
                 continue
             }
             throw AppError("Unexpected attribute: \\(key)")

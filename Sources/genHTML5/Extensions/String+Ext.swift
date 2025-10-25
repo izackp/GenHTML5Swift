@@ -11,8 +11,15 @@ extension String {
         return firstLetter.uppercased() + self.dropFirst()
     }
     
-    func toCamelCase() -> String {
-        let components = self.split(separator: "-")
+    func fixPoorCharactersForVariables() -> String {
+        let firstPass = self.camelCaseBy("-")
+        let secondPass = firstPass.replacingOccurrences(of: "/", with: "_")
+
+        return secondPass
+    }
+    
+    func camelCaseBy(_ c: Character) -> String {
+        let components = self.split(separator: c)
         guard let first = components.first?.lowercased() else { return "" }
         
         let rest = components.dropFirst().map { $0.capitalized }
@@ -20,5 +27,4 @@ extension String {
 
         return camelCase
     }
-    
 }
